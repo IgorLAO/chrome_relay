@@ -1,0 +1,25 @@
+# Dependencies (reinstalled in image)
+**/node_modules
+
+# Build output (regenerated in image)
+public/
+
+# Local TLS (image bakes a self-signed pair; override via compose volume)
+key.pem
+cert.pem
+
+# Local env (use compose env vars instead)
+.env
+
+# VCS, editor, agent
+.git
+.gitignore
+.claude
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Docs aren't needed at runtime
+CLAUDE.md

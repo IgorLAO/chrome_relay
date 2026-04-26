@@ -1,0 +1,31 @@
+services:
+  chrome:
+    image: zenika/alpine-chrome:latest
+    # Image's ENTRYPOINT already includes --headless --no-sandbox
+    # --disable-dev-shm-usage. We append the debugging + anti-throttling flags.
+    command:
+      - --remote-debugging-address=0.0.0.0
+      - --remote-debugging-port=9222
+      - --disable-background-timer-throttling
+      - --disable-backgrounding-occluded-windows
+      - --disable-renderer-backgrounding
+    restart: unless-stopped
+
+  relay:
+    build: .
+    depends_on:
+      - chrome
+    environment:
+      CHROME_URL: http://chrome:9222
+      HTTP_PORT: "3050"
+      HTTPS_PORT: "3051"
+      DEFAULT_URL: ${DEFAULT_URL:-https://google.com}
+    ports:
+      - "3050:3050"
+      - "3051:3051"
+    restart: unless-stopped
+    # Uncomment to use your own TLS certificates instead of the self-signed
+    # ones baked into the image:
+    # volumes:
+    #   - ./key.pem:/repo/key.pem:ro
+    #   - ./cert.pem:/repo/cert.pem:ro
