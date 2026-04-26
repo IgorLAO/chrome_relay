@@ -7,13 +7,18 @@ import { setupDownloadHandler } from './download.ts';
 const FRAME_W       = parseInt(process.env.FRAME_W       || '1280');
 const FRAME_H       = parseInt(process.env.FRAME_H       || '720');
 const FRAME_QUALITY = parseInt(process.env.FRAME_QUALITY || '70');
-const DEFAULT_URL   = process.env.DEFAULT_URL || 'https://info.cern.ch/';
+const DEFAULT_URL   = process.env.DEFAULT_URL ?? 'google.com';
 
 export async function createSession(browser: Browser, ws: any) {
     const page = await browser.newPage();
-    await page.bringToFront(); // makes the tab active so input events register on first click
     await page.setViewport({ width: FRAME_W, height: FRAME_H });
     const cdp = await page.createCDPSession();
+
+    // Make every page *think* it has focus + active lifecycle, so background
+    // tabs keep rendering and accepting input. Calling page.bringToFront() here
+    // would freeze every other user's screen as soon as a new session connects.
+    await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+    await cdp.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
 
     const sessionId = crypto.randomUUID();
     const sessionDir = path.join('/tmp', 'chrome_relay_downloads', sessionId);
@@ -44,7 +49,7 @@ export async function createSession(browser: Browser, ws: any) {
             ws.send(JSON.stringify({ t: 'title', title }));
     });
 
-    page.goto(DEFAULT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    page.goto(process.env.DEFAULT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     return {
         page,

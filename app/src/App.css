@@ -1,0 +1,105 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #1a1a1a; overflow: hidden; font-family: Arial, sans-serif; }
+
+#bar {
+  height: 44px;
+  background: #2d2d2d;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid #444;
+  user-select: none;
+}
+
+#bar button {
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 18px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#bar button:hover { background: #444; }
+#bar button:disabled { color: #555; cursor: default; }
+#bar button:disabled:hover { background: none; }
+
+#url-wrap { flex: 1; position: relative; }
+#url-input {
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: none;
+  background: #444;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+#url-input:focus { background: #555; }
+
+#ping {
+  color: #666;
+  font-size: 11px;
+  padding: 0 6px;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+#viewport {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 44px);
+  overflow: hidden;
+}
+
+#screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #1a1a1a;
+  color: #aaa;
+  font-size: 16px;
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #444;
+  border-top-color: #888;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#dl-banner {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+  background: #2d2d2d;
+  color: #eee;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}

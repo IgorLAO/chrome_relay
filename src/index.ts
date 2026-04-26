@@ -47,8 +47,7 @@ async function main() {
         });
     }
 
-    httpServer.listen(HTTP_PORT,   () => console.log(`HTTP  → http://0.0.0.0:${HTTP_PORT}`));
-    httpsServer.listen(HTTPS_PORT, () => console.log(`HTTPS → https://0.0.0.0:${HTTPS_PORT}`));
+    httpsServer.listen(HTTPS_PORT, () => console.log(`HTTPS → https://localhost:${HTTPS_PORT}`));
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
