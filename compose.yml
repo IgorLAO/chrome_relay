@@ -4,6 +4,7 @@ services:
     # Image's ENTRYPOINT already includes --headless --no-sandbox
     # --disable-dev-shm-usage. We append the debugging + anti-throttling flags.
     command:
+      - --no-zygote
       - --remote-debugging-address=0.0.0.0
       - --remote-debugging-port=9222
       - --remote-allow-origins=*
