@@ -47,6 +47,7 @@ async function main() {
         });
     }
 
+    httpServer.listen(HTTP_PORT,  () => console.log(`HTTP  → http://localhost:${HTTP_PORT}`));
     httpsServer.listen(HTTPS_PORT, () => console.log(`HTTPS → https://localhost:${HTTPS_PORT}`));
 }
 

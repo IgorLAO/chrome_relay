@@ -1,21 +1,21 @@
-import puppeteer from 'puppeteer';
+import puppeteer, { type Browser } from 'puppeteer';
 
-const CHROME_URL = process.env.CHROME_URL || 'http://127.0.0.1:9222';
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser';
 
-export async function connectToBrowser(retries = 30): Promise<puppeteer.Browser> {
-    let lastErr: unknown;
-    for (let i = 0; i < retries; i++) {
-        try {
-            const browser = await puppeteer.connect({
-                browserURL: CHROME_URL,
-                defaultViewport: null,
-            });
-            console.log('Chrome connected');
-            return browser;
-        } catch (e) {
-            lastErr = e;
-            if (i < retries - 1) await new Promise(r => setTimeout(r, 1000));
-        }
-    }
-    throw new Error(`Could not connect to Chrome at ${CHROME_URL}: ${lastErr}`);
+export async function connectToBrowser(): Promise<Browser> {
+    const browser = await puppeteer.launch({
+        executablePath: CHROMIUM_PATH,
+        headless: true,
+        defaultViewport: null,
+        args: [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+        ],
+    });
+    console.log('Chromium launched');
+    return browser;
 }

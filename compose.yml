@@ -1,27 +1,7 @@
 services:
-  chrome:
-    image: zenika/alpine-chrome:latest
-    # Image's ENTRYPOINT already includes --headless --no-sandbox
-    # --disable-dev-shm-usage. We append the debugging + anti-throttling flags.
-    command:
-      - --no-sandbox
-      - --no-zygote
-      - --remote-debugging-address=0.0.0.0
-      - --remote-debugging-port=9222
-      - --remote-allow-origins=*
-      - --disable-background-timer-throttling
-      - --disable-backgrounding-occluded-windows
-      - --disable-renderer-backgrounding
-    networks:
-      - proxy
-    restart: unless-stopped
-
   relay:
     build: .
-    depends_on:
-      - chrome
     environment:
-      CHROME_URL: http://chrome:9222
       HTTP_PORT: "3050"
       HTTPS_PORT: "3051"
       DEFAULT_URL: ${DEFAULT_URL:-https://pwisistemas1.digisac.chat/}
