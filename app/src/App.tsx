@@ -3,10 +3,12 @@ import './App.css';
 import Canvas from './components/canvas';
 import {
     drawJpegFrame,
-    normalizeUrl,
     textToKeydownMessages,
     triggerBase64Download,
 } from './utils';
+import Bar from './components/bar';
+import type { WsMessage } from './types';
+
 
 function App() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -15,7 +17,6 @@ function App() {
 
     const [connected, setConnected] = useState(false);
     const [overlayMsg, setOverlayMsg] = useState('Connecting…');
-    const [urlValue, setUrlValue] = useState('');
     const [pingText, setPingText] = useState('–');
     const [dlBanner, setDlBanner] = useState({ text: '', visible: false });
 
@@ -24,7 +25,7 @@ function App() {
     const pingTime = useRef(0);
     const dlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const send = useCallback((obj: unknown) => {
+    const send = useCallback((obj: WsMessage) => {
         const ws = wsRef.current;
         if (ws?.readyState === WebSocket.OPEN)
             ws.send(typeof obj === 'string' ? obj : JSON.stringify(obj));
@@ -47,9 +48,11 @@ function App() {
         let destroyed = false;
 
         function connect() {
-            if (destroyed) return;
-            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${proto}//${location.host}/ws`);
+            if (destroyed) {
+                return;
+            }
+
+            const ws = new WebSocket(`wss://${location.host}/ws`);
             ws.binaryType = 'arraybuffer';
             wsRef.current = ws;
 
@@ -59,9 +62,10 @@ function App() {
                 if (viewport && canvas) {
                     const w = viewport.clientWidth;
                     const h = viewport.clientHeight;
-                    vpW.current = w; vpH.current = h;
+                    vpW.current = w; 
+                    vpH.current = h;
                     canvas.width = w; canvas.height = h;
-                    send({ t: 'resize', w, h });
+                    send({ type: 'resize', width: w, height: h });
                 }
                 canvas?.focus();
                 setConnected(true);
@@ -70,15 +74,23 @@ function App() {
             ws.onmessage = async (ev) => {
                 if (typeof ev.data !== 'string') {
                     const canvas = canvasRef.current;
-                    if (canvas) await drawJpegFrame(canvas, ev.data, vpW.current, vpH.current);
-                    return;
+                    if (canvas) {
+                        await drawJpegFrame(canvas, ev.data, vpW.current, vpH.current);
+                        return;
+                    }
                 }
                 const msg = JSON.parse(ev.data);
-                if      (msg.t === 'url')             setUrlValue(msg.url);
-                else if (msg.t === 'title')            { if (msg.title) document.title = msg.title + ' – Chrome'; }
-                else if (msg.t === 'pong')             setPingText((Date.now() - pingTime.current) + ' ms');
-                else if (msg.t === 'download_start')   onDownloadStart(msg.filename);
-                else if (msg.t === 'download_ready')   onDownloadReady(msg.filename, msg.data);
+                switch (msg.type) {
+                    case 'pong':
+                        setPingText((Date.now() - pingTime.current) + ' ms');
+                        break
+                    case 'download_start':
+                        onDownloadStart(msg.filename)
+                        break
+                    case 'download_ready':
+                        onDownloadReady(msg.filename, msg.data)
+                        break
+                }
             };
 
             ws.onclose = () => {
@@ -99,7 +111,7 @@ function App() {
         const id = setInterval(() => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
                 pingTime.current = Date.now();
-                send({ t: 'ping' });
+                send({ type: 'ping' });
             }
         }, 5000);
         return () => clearInterval(id);
@@ -118,7 +130,7 @@ function App() {
             vpW.current = w; vpH.current = h;
             const canvas = canvasRef.current;
             if (canvas) { canvas.width = w; canvas.height = h; }
-            send({ t: 'resize', w, h });
+            send({ type: 'resize', width: w, height: h });
         });
         observer.observe(viewport);
         return () => observer.disconnect();
@@ -130,44 +142,18 @@ function App() {
             if (document.activeElement === canvasRef.current) return;
             const text = e.clipboardData?.getData('text/plain');
             if (!text) return;
-            for (const msg of textToKeydownMessages(text)) send(msg);
+            for (const msg of textToKeydownMessages(text)){
+                send(msg)
+            }
         };
         document.addEventListener('paste', onPaste);
         return () => document.removeEventListener('paste', onPaste);
     }, [send]);
 
-    function navigate() {
-        const url = normalizeUrl(urlValue);
-        if (!url) return;
-        send({ t: 'nav', url });
-        canvasRef.current?.focus();
-    }
-
     return (
         <>
-            <div id="bar">
-                <button id="btn-back" title="Back"
-                    onClick={() => { send({ t: 'back' }); canvasRef.current?.focus(); }}>&#8592;</button>
-                <button id="btn-fwd" title="Forward"
-                    onClick={() => { send({ t: 'fwd' }); canvasRef.current?.focus(); }}>&#8594;</button>
-                <button id="btn-reload" title="Reload"
-                    onClick={() => { send({ t: 'reload' }); canvasRef.current?.focus(); }}>&#8635;</button>
-                <div id="url-wrap">
-                    <input
-                        id="url-input"
-                        type="text"
-                        placeholder="Enter URL or search…"
-                        spellCheck={false}
-                        autoComplete="off"
-                        value={urlValue}
-                        onChange={e => setUrlValue(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') navigate(); e.stopPropagation(); }}
-                        onFocus={e => e.target.select()}
-                    />
-                </div>
-                <span id="ping">{pingText}</span>
-            </div>
 
+            <Bar pingValue={pingText} />
             <div id="viewport" ref={viewportRef}>
                 <Canvas canvasRef={canvasRef} send={send} />
                 {!connected && (

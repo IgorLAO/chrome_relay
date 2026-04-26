@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { BUTTONS, getMods, getVirtualKeyCode } from '../utils';
+import type { WsMessage } from '../types';
 
 interface CanvasProps {
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
-    send: (data: unknown) => void;
+    send: (data: WsMessage) => void;
 }
 
 function Canvas({ canvasRef, send }: CanvasProps) {
@@ -30,7 +31,7 @@ function Canvas({ canvasRef, send }: CanvasProps) {
             if (now - lastMoveTime < 16) return;
             lastMoveTime = now;
             const { x, y } = scaleCoords(e);
-            sendRef.current({ t: 'mouse', d: { type: 'mouseMoved', x, y, modifiers: getMods(e) } });
+            sendRef.current({ type: 'mouse', params: { type: 'mouseMoved', x, y, modifiers: getMods(e) } });
         };
 
         const onMouseDown = (e: MouseEvent) => {
@@ -41,7 +42,7 @@ function Canvas({ canvasRef, send }: CanvasProps) {
             const sameSpot = Math.abs(x - lastClickX) < 4 && Math.abs(y - lastClickY) < 4;
             clickCount = (now - lastClickTime < 500 && sameSpot) ? 2 : 1;
             lastClickTime = now; lastClickX = x; lastClickY = y;
-            sendRef.current({ t: 'mouse', d: {
+            sendRef.current({ type: 'mouse', params: {
                 type: 'mousePressed', x, y,
                 button: BUTTONS[e.button] || 'none', clickCount, modifiers: getMods(e),
             }});
@@ -49,7 +50,7 @@ function Canvas({ canvasRef, send }: CanvasProps) {
 
         const onMouseUp = (e: MouseEvent) => {
             const { x, y } = scaleCoords(e);
-            sendRef.current({ t: 'mouse', d: {
+            sendRef.current({ type: 'mouse', params: {
                 type: 'mouseReleased', x, y,
                 button: BUTTONS[e.button] || 'none', clickCount, modifiers: getMods(e),
             }});
@@ -60,14 +61,14 @@ function Canvas({ canvasRef, send }: CanvasProps) {
         const onWheel = (e: WheelEvent) => {
             e.preventDefault();
             const { x, y } = scaleCoords(e);
-            sendRef.current({ t: 'wheel', x, y, dx: e.deltaX, dy: e.deltaY, mod: getMods(e) });
+            sendRef.current({ type: 'wheel', x, y, deltaX: e.deltaX, deltaY: e.deltaY, modifiers: getMods(e) });
         };
 
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) return;
             e.preventDefault();
             const vk = getVirtualKeyCode(e);
-            sendRef.current({ t: 'keydown', d: {
+            sendRef.current({ type: 'keydown', params: {
                 key: e.key, code: e.code, modifiers: getMods(e),
                 windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk,
             }});
@@ -77,7 +78,7 @@ function Canvas({ canvasRef, send }: CanvasProps) {
             if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) return;
             e.preventDefault();
             const vk = getVirtualKeyCode(e);
-            sendRef.current({ t: 'keyup', d: {
+            sendRef.current({ type: 'keyup', params: {
                 key: e.key, code: e.code, modifiers: getMods(e),
                 windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk,
             }});
