@@ -211,6 +211,175 @@ Função `scaleCoords`: o `<canvas>` na tela tem tamanho CSS diferente do seu `w
 
 ---
 
+## 9.4 Como o React funciona neste projeto (em profundidade)
+
+O cliente é um **SPA React 19** servido como bundle estático. Ele não faz SSR, não usa router, e tem **uma única árvore de componentes**: `<App />` → `<Canvas />`. Toda a "tela" do navegador remoto é, na verdade, **um `<canvas>`** desenhado por JS — o React só cuida da casca em volta (barra de URL, overlay de "conectando", banner de download).
+
+### 9.4.1 Bootstrap
+
+`app/index.html`:
+```html
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+```
+
+`main.tsx`:
+```tsx
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)
+```
+
+- `createRoot` é a API do React 18+ para o **concurrent renderer**. Substitui o antigo `ReactDOM.render`.
+- `<StrictMode>` em desenvolvimento **invoca cada `useEffect` duas vezes** (mount → unmount → mount) para detectar efeitos não idempotentes. Por isso, todo `useEffect` em `App.tsx` precisa ter cleanup correto (`return () => ws.close()`, `clearInterval`, etc.) — sem isso teríamos duas conexões WebSocket abertas em dev.
+
+> `createRoot`: <https://react.dev/reference/react-dom/client/createRoot>
+> `StrictMode`: <https://react.dev/reference/react/StrictMode>
+
+### 9.4.2 Por que um único componente segura tudo
+
+A regra geral em React é: **estado vive o mais perto possível de quem o usa, mas o mais alto possível de quem precisa compartilhá-lo**. Aqui, quem precisa do WebSocket é:
+- A barra de URL (recebe `url` e `title`).
+- O canvas (envia eventos de input).
+- O overlay (mostra "Reconnecting…").
+- O banner de download.
+
+Como tudo está sob `<App />`, o WebSocket vive em `App.tsx` via `useRef`, e a função `send` é passada como prop para `<Canvas />`. Não tem Redux nem Context — não precisa.
+
+### 9.4.3 `useRef` vs `useState` — quando cada um
+
+A escolha aqui é deliberada e vale entender:
+
+| Dado | Hook | Por quê |
+|------|------|---------|
+| `connected`, `urlValue`, `pingText`, `dlBanner`, `overlayMsg` | `useState` | A UI **muda visualmente** quando esses valores mudam → precisa de re-render. |
+| `wsRef`, `canvasRef`, `viewportRef`, `vpW`, `vpH`, `pingTime`, `dlTimer` | `useRef` | São objetos mutáveis que **não devem disparar re-render** quando mudam. Se `wsRef` fosse state, cada mensagem WebSocket re-renderizaria todo o app. |
+
+`useRef({}).current` é basicamente uma "caixa" persistente entre renders. O React garante que o objeto retornado é o **mesmo** entre renders — diferente de uma variável local, que é recriada a cada render.
+
+> `useRef`: <https://react.dev/reference/react/useRef>
+> `useState`: <https://react.dev/reference/react/useState>
+
+### 9.4.4 Os quatro `useEffect` de `App.tsx` — anatomia
+
+`useEffect(callback, deps)` roda **depois** do React commitar o DOM. O array de deps controla quando rodar de novo. Cleanup roda antes da próxima execução **e** no unmount.
+
+#### Effect 1 — WebSocket lifecycle (`deps: []`)
+
+`deps: []` significa "rode uma vez no mount, faça cleanup no unmount". A `connect()` interna é uma função recursiva: o `onclose` agenda `setTimeout(connect, 2000)`, então a reconexão é automática. A flag `destroyed` (capturada por closure) garante que, se o componente desmontar enquanto o `setTimeout` ainda está pendente, a próxima `connect()` não dispara.
+
+A regra `eslint-disable-next-line react-hooks/exhaustive-deps` está lá porque `send` é usado dentro mas intencionalmente *não* é dependência — a gente não quer reabrir o WebSocket toda vez que `send` mudar de identidade.
+
+#### Effect 2 — Ping (`deps: [send]`)
+
+A cada 5 s, manda `{ t: 'ping' }`. `send` é estável porque é criada com `useCallback(..., [])`, então o efeito **não** vai realmente reexecutar — mas declarar a dep deixa o ESLint feliz e blinda contra refatorações futuras.
+
+#### Effect 3 — `ResizeObserver` (`deps: [send]`)
+
+Observa mudanças de tamanho do `<div id="viewport">` com a API `ResizeObserver` (não é React, é DOM puro). Quando o tamanho muda, atualiza `canvas.width/height` (que **não** vão pelo React — é manipulação direta do DOM via ref) e manda um `resize` para o servidor. O cleanup faz `observer.disconnect()`.
+
+#### Effect 4 — Paste fallback (`deps: [send]`)
+
+`document.addEventListener('paste', ...)` no global. Cleanup remove o listener. Resolve o caso de o usuário colar texto fora do canvas (no input de URL, por exemplo) — converte cada caractere em `keydown` e envia.
+
+> `useEffect`: <https://react.dev/reference/react/useEffect>
+
+### 9.4.5 `useCallback` — por que `send` é memoizado
+
+```tsx
+const send = useCallback((obj) => { ... }, []);
+```
+
+Sem `useCallback`, toda renderização de `<App />` criaria uma `send` nova → seria passada como prop diferente para `<Canvas />` → o `useEffect` interno do Canvas re-executaria, removendo e re-anexando todos os listeners de mouse/teclado. **Catastrófico para performance.**
+
+Com `useCallback(..., [])`, `send` é a mesma função entre renders. Mas tem um detalhe: o `Canvas` ainda usa `useRef + useEffect` pra "sincronizar" a versão atual dela:
+
+```tsx
+const sendRef = useRef(send);
+useEffect(() => { sendRef.current = send; });
+```
+
+Esse padrão (`latest ref`) é o jeito canônico de chamar callbacks "frescos" de dentro de listeners DOM que foram anexados uma vez só. Veja o motivo: se o listener capturasse `send` por closure, ele sempre chamaria a versão *original*. Usando `sendRef.current()`, sempre chama a mais recente.
+
+> `useCallback`: <https://react.dev/reference/react/useCallback>
+> Padrão "latest ref": <https://www.epicreact.dev/the-latest-ref-pattern-in-react>
+
+### 9.4.6 Refs DOM — `canvasRef` e `viewportRef`
+
+```tsx
+const canvasRef = useRef<HTMLCanvasElement>(null);
+...
+<canvas ref={canvasRef} id="screen" />
+```
+
+O React preenche `canvasRef.current` com o nó DOM real **depois** do commit. Antes do primeiro render, é `null` — por isso todos os usos checam `if (canvas)`.
+
+A prop `canvasRef` é passada *de baixo pra cima*: criada em `App`, repassada para `<Canvas />`, que faz `<canvas ref={canvasRef} />`. Isso permite que o pai (`App`) chame `canvasRef.current?.focus()` quando o usuário clica num botão da barra. (Alternativa moderna seria `forwardRef`, mas passar como prop é igualmente válido em React 19.)
+
+> Refs em DOM: <https://react.dev/reference/react/useRef#manipulating-the-dom-with-a-ref>
+
+### 9.4.7 O `<canvas>` é "fora da árvore React"
+
+Ponto importante: depois que o `<canvas>` é montado, **o React não tem mais nada a ver com o que aparece nele**. O conteúdo dos pixels é desenhado por `drawJpegFrame`, que faz `ctx.drawImage(...)` direto. O React não re-renderiza nada quando um frame chega.
+
+Isso é proposital: re-renderizar via React a 25 fps seria desperdício total. O React só toca o DOM quando o **estado da UI** muda (URL nova, ping, banner de download).
+
+### 9.4.8 Atualizações controladas pelo servidor
+
+Quando uma mensagem WebSocket chega:
+
+```tsx
+ws.onmessage = async (ev) => {
+  if (typeof ev.data !== 'string') {
+    await drawJpegFrame(canvas, ev.data, vpW.current, vpH.current); // não passa por React
+    return;
+  }
+  const msg = JSON.parse(ev.data);
+  if (msg.t === 'url') setUrlValue(msg.url);              // dispara re-render
+  else if (msg.t === 'pong') setPingText('... ms');       // dispara re-render
+  else if (msg.t === 'download_ready') onDownloadReady(...); // dispara re-render
+};
+```
+
+Cada `setX(...)` agenda um re-render do `<App />`. O React 19 batcha múltiplos `setState` no mesmo handler em um único render (automatic batching).
+
+> Automatic batching no React 18+: <https://react.dev/blog/2022/03/29/react-v18#new-feature-automatic-batching>
+
+### 9.4.9 Vite + JSX + TypeScript — o que acontece no build
+
+`vite.config.ts`:
+```ts
+plugins: [react()],
+build: { outDir: '../public' },
+```
+
+- `@vitejs/plugin-react` integra o **SWC** (ou Babel) para transformar JSX → `React.createElement(...)`.
+- TypeScript é compilado *separadamente* (`tsc -b` no script `build`) só para checagem; o Vite usa esbuild para a transpilação rápida.
+- Saída: `index.html` + `assets/index-[hash].js` + `assets/index-[hash].css`, todos copiados para `public/`, que o servidor Bun então serve estaticamente.
+
+Em desenvolvimento (`bun run dev`), o Vite roda um dev server com **HMR** (Hot Module Replacement) e o `react-refresh` plugin preserva estado de componentes durante edits.
+
+> Vite + React: <https://vite.dev/guide/features#jsx>
+> React Refresh: <https://github.com/facebook/react/tree/main/packages/react-refresh>
+
+### 9.4.10 Resumo: divisão de responsabilidades
+
+| Coisa | Quem cuida |
+|-------|-----------|
+| Layout (barra, viewport, overlay) | React (`App.tsx`) |
+| Estado da UI (URL, ping, banner) | `useState` em `App` |
+| Conexão WebSocket | `useRef` + `useEffect` em `App` |
+| Listeners de input (mouse/teclado) | `useEffect` em `Canvas` (DOM puro) |
+| Renderização do conteúdo do navegador | `drawImage` em `<canvas>` (zero React) |
+| Detecção de resize | `ResizeObserver` em `useEffect` |
+| Lógica pura (mapeamentos, conversões) | `utils/index.ts` (sem React) |
+
+**Princípio geral**: React para o que muda raramente e precisa de re-render. DOM puro para o que muda 25 vezes por segundo.
+
+---
+
 ## 10. Como cada usuário tem sua própria aba
 
 Resumindo o ponto crítico: **cada WebSocket → uma `page` nova**.
