@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ── Stage 1: build the React client ──────────────────────────────────────────
-FROM oven/bun:1.3-alpine AS web
+FROM --platform=linux/amd64 oven/bun:1.3-alpine AS web
 WORKDIR /repo/app
 
 COPY app/package.json app/bun.lock ./
@@ -12,7 +12,7 @@ RUN bun run build
 # Vite outDir is ../public → artifacts land at /repo/public/
 
 # ── Stage 2: relay server runtime ────────────────────────────────────────────
-FROM oven/bun:1.3-alpine AS runtime
+FROM --platform=linux/amd64 oven/bun:1.3-alpine AS runtime
 WORKDIR /repo
 
 # We connect to a remote Chrome via CDP — never need puppeteer's bundled one.

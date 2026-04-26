@@ -1,6 +1,7 @@
 services:
   chrome:
     image: zenika/alpine-chrome:latest
+    platform: linux/amd64
     # Image's ENTRYPOINT already includes --headless --no-sandbox
     # --disable-dev-shm-usage. We append the debugging + anti-throttling flags.
     command:
@@ -9,23 +10,37 @@ services:
       - --disable-background-timer-throttling
       - --disable-backgrounding-occluded-windows
       - --disable-renderer-backgrounding
+    networks:
+      - proxy
     restart: unless-stopped
 
   relay:
     build: .
+    platform: linux/amd64
     depends_on:
       - chrome
     environment:
       CHROME_URL: http://chrome:9222
       HTTP_PORT: "3050"
       HTTPS_PORT: "3051"
-      DEFAULT_URL: ${DEFAULT_URL:-https://google.com}
-    ports:
-      - "3050:3050"
-      - "3051:3051"
+      DEFAULT_URL: ${DEFAULT_URL:-https://pwisistemas1.digisac.chat/}
+    networks:
+      - proxy
     restart: unless-stopped
-    # Uncomment to use your own TLS certificates instead of the self-signed
-    # ones baked into the image:
-    # volumes:
-    #   - ./key.pem:/repo/key.pem:ro
-    #   - ./cert.pem:/repo/cert.pem:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # Router HTTPS — defina RELAY_HOST no .env (ex.: relay.seudominio.com)
+      - "traefik.http.routers.relay.rule=Host(`${RELAY_HOST}`)"
+      - "traefik.http.routers.relay.entrypoints=websecure"
+      - "traefik.http.routers.relay.tls=true"
+      - "traefik.http.routers.relay.tls.certresolver=myresolver"
+      - "traefik.http.routers.relay.middlewares=relay-auth"
+      # Backend HTTP (Traefik termina TLS na borda; WebSocket passa transparente)
+      - "traefik.http.services.relay.loadbalancer.server.port=3050"
+      # Basic auth — usuário: admin / senha: CarlinhosCode (bcrypt, $ escapado como $$)
+      - "traefik.http.middlewares.relay-auth.basicauth.users=admin:$$2y$$05$$mEmylh9niueWgeQUwCnuROH8SJJVYWn/Mskg3fJGX83YUhtkzEMFO"
+
+networks:
+  proxy:
+    external: true
