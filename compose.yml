@@ -1,7 +1,6 @@
 services:
   chrome:
     image: zenika/alpine-chrome:latest
-    platform: linux/amd64
     # Image's ENTRYPOINT already includes --headless --no-sandbox
     # --disable-dev-shm-usage. We append the debugging + anti-throttling flags.
     command:
@@ -17,7 +16,6 @@ services:
 
   relay:
     build: .
-    platform: linux/amd64
     depends_on:
       - chrome
     environment:
