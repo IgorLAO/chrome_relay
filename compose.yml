@@ -15,7 +15,7 @@ services:
       - "traefik.http.routers.relay.rule=Host(`${RELAY_HOST}`)"
       - "traefik.http.routers.relay.entrypoints=websecure"
       - "traefik.http.routers.relay.tls=true"
-      - "traefik.http.routers.relay.tls.certresolver=myresolver"
+      - "traefik.http.routers.relay.tls.certresolver=letsencrypt"
       - "traefik.http.routers.relay.middlewares=relay-auth"
       # Backend HTTP (Traefik termina TLS na borda; WebSocket passa transparente)
       - "traefik.http.services.relay.loadbalancer.server.port=3050"
