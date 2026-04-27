@@ -4,7 +4,7 @@ services:
     environment:
       HTTP_PORT: "3050"
       HTTPS_PORT: "3051"
-      DEFAULT_URL: ${DEFAULT_URL:-https://pwisistemas1.digisac.chat/}
+      DEFAULT_URL: ${DEFAULT_URL:-https://google.com/}
     networks:
       - proxy
     restart: unless-stopped
