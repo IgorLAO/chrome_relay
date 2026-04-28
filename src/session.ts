@@ -14,9 +14,8 @@ export async function createSession(browser: Browser, ws: any) {
     await page.setViewport({ width: FRAME_W, height: FRAME_H });
     const cdp = await page.createCDPSession();
 
-    // Make every page *think* it has focus + active lifecycle, so background
-    // tabs keep rendering and accepting input. Calling page.bringToFront() here
-    // would freeze every other user's screen as soon as a new session connects.
+    // evita a aca hibernar quando outro usaurio logar e ela perder o foco
+    // chrome usa para economizar recursos
     await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
     await cdp.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
 

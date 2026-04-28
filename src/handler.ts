@@ -41,8 +41,6 @@ export function makeMessageHandler(page: any, cdp: any, ws: any) {
 
             case 'keydown':
                 cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...msg.params }).catch(() => {});
-                // Skip char event for Ctrl/Meta shortcuts — sending it would type the character
-                // instead of triggering the shortcut (e.g. Ctrl+C would insert 'c' not copy)
                 if (msg.params.key && msg.params.key.length === 1 && !(msg.params.modifiers & (CTRL | META)))
                     cdp.send('Input.dispatchKeyEvent', { type: 'char', text: msg.params.key }).catch(() => {});
                 return;
