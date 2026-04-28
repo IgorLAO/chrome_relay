@@ -9,16 +9,6 @@ export function makeMessageHandler(page: any, cdp: any, ws: any) {
         try { msg = JSON.parse(raw); } catch { return; }
 
         switch (msg.type) {
-            case 'nav': {
-                let url = (msg.url as string).trim();
-                if (!url.match(/^https?:\/\//)) url = 'https://' + url;
-                page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-                return;
-            }
-            case 'back':   page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {}); return;
-            case 'fwd':    page.goForward({ waitUntil: 'domcontentloaded' }).catch(() => {}); return;
-            case 'reload': page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {}); return;
-
             case 'ping':
                 ws.send('{"type":"pong"}');
                 return;
