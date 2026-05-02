@@ -1,6 +1,6 @@
 import puppeteer, { type Browser } from 'puppeteer';
 
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser';
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
 
 export async function connectToBrowser(): Promise<Browser> {
     const browser = await puppeteer.launch({

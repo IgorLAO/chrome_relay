@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BUTTONS, getMods, getVirtualKeyCode } from '../utils';
+import { BUTTONS, getMods, getVirtualKeyCode, textToKeydownMessages } from '../utils';
 import type { WsMessage } from '../types';
 
 interface CanvasProps {
@@ -22,7 +22,7 @@ function Canvas({ canvasRef, send }: CanvasProps) {
             const rect = canvas.getBoundingClientRect();
             return {
                 x: Math.round((e.clientX - rect.left) * (canvas.width / rect.width)),
-                y: Math.round((e.clientY - rect.top)  * (canvas.height / rect.height)),
+                y: Math.round((e.clientY - rect.top) * (canvas.height / rect.height)),
             };
         };
 
@@ -42,18 +42,22 @@ function Canvas({ canvasRef, send }: CanvasProps) {
             const sameSpot = Math.abs(x - lastClickX) < 4 && Math.abs(y - lastClickY) < 4;
             clickCount = (now - lastClickTime < 500 && sameSpot) ? 2 : 1;
             lastClickTime = now; lastClickX = x; lastClickY = y;
-            sendRef.current({ type: 'mouse', params: {
-                type: 'mousePressed', x, y,
-                button: BUTTONS[e.button] || 'none', clickCount, modifiers: getMods(e),
-            }});
+            sendRef.current({
+                type: 'mouse', params: {
+                    type: 'mousePressed', x, y,
+                    button: BUTTONS[e.button] || 'none', clickCount, modifiers: getMods(e),
+                }
+            });
         };
 
         const onMouseUp = (e: MouseEvent) => {
             const { x, y } = scaleCoords(e);
-            sendRef.current({ type: 'mouse', params: {
-                type: 'mouseReleased', x, y,
-                button: BUTTONS[e.button] || 'none', clickCount, modifiers: getMods(e),
-            }});
+            sendRef.current({
+                type: 'mouse', params: {
+                    type: 'mouseReleased', x, y,
+                    button: BUTTONS[e.button] || 'none', clickCount, modifiers: getMods(e),
+                }
+            });
         };
 
         const onContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -68,20 +72,47 @@ function Canvas({ canvasRef, send }: CanvasProps) {
             if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) return;
             e.preventDefault();
             const vk = getVirtualKeyCode(e);
-            sendRef.current({ type: 'keydown', params: {
-                key: e.key, code: e.code, modifiers: getMods(e),
-                windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk,
-            }});
+
+            if (e.ctrlKey && (e.key === 'v' || e.key === 'c')) {
+                e.preventDefault();
+                navigator.clipboard.readText().then(text => {
+                    for (const msg of textToKeydownMessages(text))
+                        sendRef.current(msg);
+                });
+                return;
+            }
+
+            sendRef.current({
+                type: 'keydown', params: {
+                    key: e.key, code: e.code, modifiers: getMods(e),
+                    windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk,
+                }
+            });
+
+
         };
 
         const onKeyUp = (e: KeyboardEvent) => {
-            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) return;
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
+                return
+            };
+
+            if (e.ctrlKey && (e.key === 'v' || e.key === 'c')) {
+                e.preventDefault();
+                navigator.clipboard.readText().then(text => {
+                    for (const msg of textToKeydownMessages(text))
+                        sendRef.current(msg);
+                });
+                return;
+            }
             e.preventDefault();
             const vk = getVirtualKeyCode(e);
-            sendRef.current({ type: 'keyup', params: {
-                key: e.key, code: e.code, modifiers: getMods(e),
-                windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk,
-            }});
+            sendRef.current({
+                type: 'keyup', params: {
+                    key: e.key, code: e.code, modifiers: getMods(e),
+                    windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk,
+                }
+            });
         };
 
         canvas.tabIndex = 0;

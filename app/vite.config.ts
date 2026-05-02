@@ -6,5 +6,6 @@ export default defineConfig({
   base: '/',
   build: {
     outDir: '../public',
+    sourcemap: true
   },
 })

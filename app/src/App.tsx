@@ -3,7 +3,6 @@ import './App.css';
 import Canvas from './components/canvas';
 import {
     drawJpegFrame,
-    textToKeydownMessages,
     triggerBase64Download,
 } from './utils';
 import Bar from './components/bar';
@@ -134,20 +133,6 @@ function App() {
         });
         observer.observe(viewport);
         return () => observer.disconnect();
-    }, [send]);
-
-    // Paste fallback (when URL bar or other input is focused, not the canvas)
-    useEffect(() => {
-        const onPaste = (e: ClipboardEvent) => {
-            if (document.activeElement === canvasRef.current) return;
-            const text = e.clipboardData?.getData('text/plain');
-            if (!text) return;
-            for (const msg of textToKeydownMessages(text)){
-                send(msg)
-            }
-        };
-        document.addEventListener('paste', onPaste);
-        return () => document.removeEventListener('paste', onPaste);
     }, [send]);
 
     return (

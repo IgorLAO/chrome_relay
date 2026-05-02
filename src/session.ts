@@ -48,7 +48,7 @@ export async function createSession(browser: Browser, ws: any) {
             ws.send(JSON.stringify({ t: 'title', title }));
     });
 
-    page.goto(process.env.DEFAULT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    page.goto(process.env.DEFAULT_URL?? '', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     return {
         page,
